@@ -1,5 +1,6 @@
 #include <Wire.h>
 #include <Servo.h>
+#include <IBusBM.h>
 #include <MPU6050_light.h>
 
 struct MPUData {
@@ -26,6 +27,10 @@ MPU6050 mpu(Wire);
 MPUData mpu_data;
 
 PIDGains yaw_gains, pitch_gains, roll_gains;
+
+IBusBM ibus;
+
+float thrust_setpoint = 1000;
 
 void config_mpu(MPU6050 *mpu) {
   Wire.begin();
@@ -93,14 +98,39 @@ void write_to_motors(float thrust, PIDGains *yaw_gains, PIDGains *pitch_gains, P
   motors[3].writeMicroseconds(back_right);
 }
 
+int read_channel(int channel_input, int min_limit, int max_limit, int default_value) {
+  int ch = ibus.readChannel(channel_input);
+  if (ch < 100) return default_value;
+  return map(ch, 1000, 2000, min_limit, max_limit);
+}
+
+bool read_switch(byte channel_input, bool default_value) {
+  int int_default_value = (default_value) ? 100 : 0;
+  int ch = read_channel(channel_input, 0, 100, int_default_value);
+  return (ch > 50);
+}
+
+void update_setpoints(PIDGains *yaw_gains, PIDGains *pitch_gains, PIDGains *roll_gains) {
+  float yaw = read_channel(1, 1000, 2000, 1000);
+  float pitch = read_channel(2, 1000, 2000, 1000);
+  float roll = read_channel(3, 1000, 2000, 1000);
+
+  yaw_gains->set_point = yaw;
+  pitch_gains->set_point = pitch;
+  roll_gains->set_point = roll;
+  thrust_setpoint = read_channel(4, 1000, 2000, 1000);
+}
+
 void setup() {
-  // put your setup code here, to run once:
+  Serial.begin(115200);
+  
   config_mpu(&mpu);
   config_motors(motors);
+
+  ibus.begin(Serial);
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
   time_prev = time;
   time = millis();
   float elapsed_time = (time - time_prev) / 1000;
@@ -109,8 +139,8 @@ void loop() {
 
   /* RC communications to get setpoints */
   /* Set setpoints in pid gains */
-  float thrust = 1000; // eventually get from controller
+  update_setpoints(&yaw_gains, &pitch_gains, &roll_gains);
   
-  write_to_motors(thrust, &yaw_gains, &pitch_gains, &roll_gains, motors, elapsed_time);
+  write_to_motors(thrust_setpoint, &yaw_gains, &pitch_gains, &roll_gains, motors, elapsed_time);
 
 }
