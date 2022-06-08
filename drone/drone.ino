@@ -54,6 +54,12 @@ void update_mpu(MPUData *mpu_data, MPU6050 *mpu) {
   /* logic to find x, y, z positions */
 }
 
+void update_current_targets(PIDGains *yaw_gains, PIDGains *pitch_gains, PIDGains *roll_gains, MPUData *data) {
+  yaw_gains->curr = data->yaw;
+  roll_gains->curr = data->roll;
+  pitch_gains->curr = data->pitch;
+}
+
 float calculate_pid_output(PIDGains *gains, float elapsed_time) {
   float error = gains->set_point - gains->curr;
   float pid_p = gains->p * error;
@@ -140,7 +146,8 @@ void loop() {
   /* RC communications to get setpoints */
   /* Set setpoints in pid gains */
   update_setpoints(&yaw_gains, &pitch_gains, &roll_gains);
+
+  update_current_targets(&yaw_gains, &pitch_gains, &roll_gains, &mpu_data);
   
   write_to_motors(thrust_setpoint, &yaw_gains, &pitch_gains, &roll_gains, motors, elapsed_time);
-
 }
