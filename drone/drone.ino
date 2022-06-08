@@ -4,8 +4,8 @@
 #include <MPU6050_light.h>
 
 struct MPUData {
-    float x, y, z;
-    float yaw, pitch, roll;
+  float x, y, z;
+  float yaw, pitch, roll;
 };
 
 // will be created for yaw, pitch, and roll controllers
@@ -35,14 +35,14 @@ float thrust_setpoint = 1000;
 void config_mpu(MPU6050 *mpu) {
   Wire.begin();
   byte status = mpu->begin();
-  
+
   Serial.print(F("MPU6050 status: "));
   Serial.println(status);
-  while(status!=0){ } // stop everything if could not connect to MPU6050
-  
+  while (status != 0) { } // stop everything if could not connect to MPU6050
+
   Serial.println(F("Calculating offsets, do not move MPU6050"));
   delay(1000);
-  mpu->calcOffsets(true,true); // gyro and accel
+  mpu->calcOffsets(true, true); // gyro and accel
   Serial.println("Done!\n");
 }
 
@@ -86,18 +86,18 @@ void config_motors(Servo motors[4]) {
 }
 
 /*
- * Order of motors: front left, front right, back left, back right
- */
+   Order of motors: front left, front right, back left, back right
+*/
 void write_to_motors(float thrust, PIDGains *yaw_gains, PIDGains *pitch_gains, PIDGains *roll_gains, Servo motors[4], float elapsed_time) {
   float yaw = calculate_pid_output(yaw_gains, elapsed_time);
   float pitch = calculate_pid_output(pitch_gains, elapsed_time);
   float roll = calculate_pid_output(roll_gains, elapsed_time);
-  
+
   float front_right = thrust + yaw + pitch + roll;
   float front_left = thrust - yaw + pitch - roll;
   float back_right = thrust - yaw - pitch + roll;
   float back_left = thrust + yaw - pitch - roll;
-  
+
   motors[0].writeMicroseconds(front_left);
   motors[1].writeMicroseconds(front_right);
   motors[2].writeMicroseconds(back_left);
@@ -129,13 +129,20 @@ void update_setpoints(PIDGains *yaw_gains, PIDGains *pitch_gains, PIDGains *roll
 
 void setup() {
   Serial.begin(115200);
-  
+
   config_mpu(&mpu);
   config_motors(motors);
 
   ibus.begin(Serial);
 }
 
+/**
+   Event loop process:
+   1. Update the gyro
+   2. Update the setpoints
+   3. Update the current targets
+   4. Use that and write to the motors
+*/
 void loop() {
   time_prev = time;
   time = millis();
@@ -148,6 +155,6 @@ void loop() {
   update_setpoints(&yaw_gains, &pitch_gains, &roll_gains);
 
   update_current_targets(&yaw_gains, &pitch_gains, &roll_gains, &mpu_data);
-  
+
   write_to_motors(thrust_setpoint, &yaw_gains, &pitch_gains, &roll_gains, motors, elapsed_time);
 }
